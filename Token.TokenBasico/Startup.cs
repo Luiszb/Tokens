@@ -9,6 +9,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Token.TokenBasico.Models;
 using Microsoft.Extensions.Configuration;
+using Token.TokenBasico.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace Token.TokenBasico
 {
@@ -28,6 +32,31 @@ namespace Token.TokenBasico
             var jwtTokenConfig = Configuration.GetSection("jwt").Get<JwtTokenConfig>();
             services.AddSingleton(jwtTokenConfig);
 
+            services.AddSingleton<IJwtAuthenticationService>(new JwtAuthenticationService(jwtTokenConfig));
+
+            services.AddAuthentication(x =>
+            {
+                x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                x.DefaultSignInScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(x =>
+            {
+                x.RequireHttpsMetadata = true;
+                x.SaveToken = true;
+                x.TokenValidationParameters = new TokenValidationParameters
+                {
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtTokenConfig.Secret)),
+                    ValidateAudience = true,
+                    ValidAudience = jwtTokenConfig.Audience,
+                    ValidateIssuerSigningKey = true,
+                    ValidateIssuer = true,
+                    ValidIssuer = jwtTokenConfig.Issuer,
+                    ValidateLifetime = true
+                };
+            });
+
+            services.AddAuthorization();
+
             services.AddControllers();
         }
 
@@ -40,6 +69,10 @@ namespace Token.TokenBasico
             }
 
             app.UseRouting();
+
+            app.UseAuthentication();
+
+            app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
             {
